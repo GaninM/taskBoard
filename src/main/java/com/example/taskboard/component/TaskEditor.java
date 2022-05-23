@@ -54,11 +54,12 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         comboBox.setAllowCustomValue(true);
         comboBox.setItems(taskTypes);
         comboBox.setValue("Substrings");
-        //comboBox.addValueChangeListener(e -> showField(e.getValue()));
+        comboBox.addValueChangeListener(e -> showField(e.getValue()));
 
-        inputData.setWidth("1000");
+
 
         add(comboBox, inputData, save, cancel, delete);
+        inputData.setWidth("1000");
 
         binder.bindInstanceFields(this);
 
@@ -71,7 +72,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
         save.addClickListener(e -> save());
         delete.addClickListener(e -> delete());
-        cancel.addClickListener(e -> editTask(task));
+        cancel.addClickListener(e -> cancel());
         setVisible(false);
     }
 
@@ -81,7 +82,13 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     }
 
     private void save() {
+        task.setType(comboBox.getValue());
         taskRepository.save(task);
+        changeHandler.onChange();
+    }
+
+    private void cancel() {
+        setVisible(false);
         changeHandler.onChange();
     }
 
@@ -102,5 +109,13 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         setVisible(true);
 
         inputData.focus();
+    }
+
+    private void showField(String type) {
+        if (type.equals("Magic square")) {
+            inputData.setVisible(false);
+        } else {
+            inputData.setVisible(true);
+        }
     }
 }
