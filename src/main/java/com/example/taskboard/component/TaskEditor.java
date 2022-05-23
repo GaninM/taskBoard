@@ -10,6 +10,7 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.spring.annotation.SpringComponent;
 import com.vaadin.flow.spring.annotation.UIScope;
@@ -25,18 +26,16 @@ import java.util.List;
 public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
     private final TaskRepository taskRepository;
-
     private Task task;
 
-    /* Field to edit properties in Task entity */
-    //private final TextField type = new TextField("Task type");
     private final ComboBox<String> comboBox = new ComboBox<>("Task type");
-    private final TextField inputData = new TextField("Input Data");
+    private final TextField inputData = new TextField("Input Data for substrings");
+    TextField inputDataForStrings = new TextField("Input Data For Strings");
+    private final TextField[][] inputDataForSquareTask = new TextField[3][3];
 
-    /* Action buttons*/
-    private final Button save = new Button("Save", VaadinIcon.CHECK.create());
+    private final Button save = new Button("Save" , VaadinIcon.CHECK.create());
     private final Button cancel = new Button("Cancel");
-    private final Button delete = new Button("Delete", VaadinIcon.TRASH.create());
+    private final Button delete = new Button("Delete" , VaadinIcon.TRASH.create());
     private final HorizontalLayout actions = new HorizontalLayout(save, cancel, delete);
 
     private final Binder<Task> binder;
@@ -51,20 +50,37 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         List<String> taskTypes = new ArrayList<>();
         taskTypes.add("Substrings");
         taskTypes.add("Magic square");
-        comboBox.setAllowCustomValue(true);
         comboBox.setItems(taskTypes);
-        comboBox.setValue("Substrings");
         comboBox.addValueChangeListener(e -> showField(e.getValue()));
 
 
+        VerticalLayout verticalLayoutForSubstringTask = new VerticalLayout();
 
-        add(comboBox, inputData, save, cancel, delete);
-        inputData.setWidth("1000");
+        inputDataForStrings.setWidth("1000px");
+        inputData.setVisible(false);
+        inputDataForStrings.setVisible(false);
+        verticalLayoutForSubstringTask.add(inputData, inputDataForStrings);
+        add(comboBox, verticalLayoutForSubstringTask);
+        for (int i = 0; i < 3; i++) {
+            HorizontalLayout horizontalLayout = new HorizontalLayout();
+            for (int j = 0; j < 3; j++) {
+                inputDataForSquareTask[i][j] = new TextField();
+                inputDataForSquareTask[i][j].setWidth("50px");
+                inputDataForSquareTask[i][j].addThemeVariants(TextFieldVariant.LUMO_SMALL);
+                inputDataForSquareTask[i][j].setLabel("[" + i + "][" + j + "]");
+                inputDataForSquareTask[i][j].setVisible(false);
+                horizontalLayout.add(inputDataForSquareTask[i][j]);
+            }
+            add(horizontalLayout);
+        }
+
+        add(actions);
+
+        inputData.setWidth("1000px");
 
         binder.bindInstanceFields(this);
 
         setSpacing(true);
-
         save.getElement().getThemeList().add("primary");
         delete.getElement().getThemeList().add("error");
 
@@ -114,8 +130,34 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private void showField(String type) {
         if (type.equals("Magic square")) {
             inputData.setVisible(false);
-        } else {
+            inputDataForStrings.setVisible(false);
+            showInputDataForSquareTask();
+        } else if (type.equals("Substrings")) {
             inputData.setVisible(true);
+            inputDataForStrings.setVisible(true);
+            hideInputDataForSquareTask();
+        } else {
+            inputData.setVisible(false);
+            inputDataForStrings.setVisible(false);
+            hideInputDataForSquareTask();
         }
     }
+
+    private void showInputDataForSquareTask() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                inputDataForSquareTask[i][j].setVisible(true);
+            }
+        }
+    }
+
+    private void hideInputDataForSquareTask() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                inputDataForSquareTask[i][j].setVisible(false);
+            }
+        }
+    }
+
+
 }
