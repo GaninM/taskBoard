@@ -33,20 +33,38 @@ public class MainView extends VerticalLayout {
         this.addNewBtn = new Button("Add new");
         this.toolbar = new HorizontalLayout(filter, addNewBtn);
 
+        add(toolbar, grid, editor, editor.getUpload());
 
-        add(toolbar, grid, editor);
-
+        //Creating filter settings
         filter.setValueChangeMode(ValueChangeMode.EAGER);
         filter.addValueChangeListener(e -> showTask(e.getValue()));
 
-        grid.asSingleSelect().addValueChangeListener(e -> editor.editTask(e.getValue()));
+        //Added function for edit table row on click
+        grid.asSingleSelect().addValueChangeListener(e -> {
+            editor.editTask(e.getValue());
+            editor.getComboBox().setVisible(false);
+            editor.getInputData().setVisible(false);
+            editor.getInputDataForStrings().setVisible(false);
+            editor.hideInputDataForSquareTask();
+            editor.getSave().setVisible(false);
+            editor.getExport().setVisible(false);
+            editor.getImporting().setVisible(false);
+            editor.getUpload().setVisible(false);
+        });
 
         editor.setChangeHandler(() -> {
             editor.setVisible(false);
             showTask(filter.getValue());
         });
 
-        addNewBtn.addClickListener(e -> editor.editTask(new Task()));
+        addNewBtn.addClickListener(e -> {
+            editor.editTask(new Task());
+            editor.getComboBox().setVisible(true);
+            editor.getSave().setVisible(true);
+            editor.getExport().setVisible(true);
+            editor.getImporting().setVisible(true);
+            editor.getUpload().setVisible(true);
+        });
 
         showTask("");
     }

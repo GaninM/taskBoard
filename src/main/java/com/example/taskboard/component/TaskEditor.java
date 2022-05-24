@@ -11,9 +11,12 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.spring.annotation.SpringComponent;
 import com.vaadin.flow.spring.annotation.UIScope;
+import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -23,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @SpringComponent
@@ -31,18 +35,29 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
     private final TaskRepository taskRepository;
     private Task task;
-
-    private final ComboBox<String> comboBox = new ComboBox<>("Task type");
-    private final TextField inputData = new TextField("Input Data for substrings");
-    TextField inputDataForStrings = new TextField("Input Data For Strings");
-    private final TextField[][] inputDataForSquareTask = new TextField[3][3];
-    private final Button save = new Button("Save", VaadinIcon.CHECK.create());
-    private final Button export = new Button("Export", VaadinIcon.CHECK.create());
-    private final Button importing = new Button("Import", VaadinIcon.CHECK.create());
-    private final Button cancel = new Button("Cancel");
-    private final Button delete = new Button("Delete", VaadinIcon.TRASH.create());
-    private final HorizontalLayout actions = new HorizontalLayout(save, export, importing, cancel, delete);
-
+    @Getter
+    private final ComboBox<String> comboBox;
+    @Getter
+    private final TextField inputData;
+    @Getter
+    private final TextField inputDataForStrings;
+    @Getter
+    private final TextField[][] inputDataForSquareTask;
+    @Getter
+    private final Button save;
+    @Getter
+    private final Button export;
+    @Getter
+    private final Button importing;
+    @Getter
+    private final Button calculate;
+    @Getter
+    private final Button cancel;
+    @Getter
+    private final Button delete;
+    private final MemoryBuffer buffer;
+    private final Upload upload;
+    private final HorizontalLayout actions;
     private final Binder<Task> binder;
     @Setter
     private ChangeHandler changeHandler;
@@ -51,6 +66,19 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     public TaskEditor(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
         this.binder = new Binder<>(Task.class);
+        this.comboBox = new ComboBox<>("Task type");
+        this.inputData = new TextField("Input Data for substrings");
+        this.inputDataForStrings = new TextField("Input Data For Strings");
+        this.inputDataForSquareTask = new TextField[3][3];
+        this.save = new Button("Save", VaadinIcon.CHECK.create());
+        this.export = new Button("Export", VaadinIcon.CHECK.create());
+        this.importing = new Button("Import", VaadinIcon.CHECK.create());
+        this.calculate = new Button("Calculate", VaadinIcon.CHECK.create());
+        this.cancel = new Button("Cancel");
+        this.delete = new Button("Delete", VaadinIcon.TRASH.create());
+        this.buffer = new MemoryBuffer();
+        this.actions = new HorizontalLayout(save, export, importing, calculate, cancel, delete);
+        this.upload = new Upload(buffer);
 
         List<String> taskTypes = new ArrayList<>();
         taskTypes.add("Substrings");
@@ -60,12 +88,14 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
 
         VerticalLayout verticalLayoutForSubstringTask = new VerticalLayout();
-
         inputDataForStrings.setWidth("1000px");
+        inputData.setWidth("1000px");
         inputData.setVisible(false);
         inputDataForStrings.setVisible(false);
         verticalLayoutForSubstringTask.add(inputData, inputDataForStrings);
         add(comboBox, verticalLayoutForSubstringTask);
+
+        //initial table for squareTask
         for (int i = 0; i < 3; i++) {
             HorizontalLayout horizontalLayout = new HorizontalLayout();
             for (int j = 0; j < 3; j++) {
@@ -79,9 +109,13 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             add(horizontalLayout);
         }
 
+        //TODO complete ride from file
+        upload.setDropAllowed(true);
+        upload.setWidth("500px");
+        upload.setAcceptedFileTypes(".txt");
+        upload.setMaxFiles(1);
+        upload.setVisible(true);
         add(actions);
-
-        inputData.setWidth("1000px");
 
         binder.bindInstanceFields(this);
 
@@ -93,23 +127,30 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
         save.addClickListener(e -> save());
         export.addClickListener(e -> export(comboBox.getValue()));
-        importing.addClickListener(e -> importing());
-        delete.addClickListener(e -> delete());
+        //TODO complete ride from file
+        importing.addClickListener(e -> e.getClickCount());
         cancel.addClickListener(e -> cancel());
+        calculate.addClickListener(e -> calculate(task));
+        delete.addClickListener(e -> delete());
         setVisible(false);
     }
 
-    private void importing() {
+    private void save() {
+        task.setType(comboBox.getValue());
+        task.setInputData(parseTask(comboBox.getValue()));
+        taskRepository.save(task);
+        changeHandler.onChange();
     }
 
+    //Method exporting data in file and saved this file
     private void export(String type) {
         String absolutePath = new File("").getAbsolutePath();
         Path path = null;
-        if (type.equals("Magic square")) {
+        if (type.equalsIgnoreCase("Magic square")) {
             File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
                     "FileType=" + comboBox.getValue() + "InputData=" + parseTask(type) + ".txt");
             path = Path.of(out.getPath());
-        } else if (type.equals("Substrings")) {
+        } else if (type.equalsIgnoreCase("Substrings")) {
             File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
                     "FileType=" + comboBox.getValue() + "InputData=" + inputData.getValue() + ".txt");
             path = Path.of(out.getPath());
@@ -123,48 +164,102 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         changeHandler.onChange();
     }
 
-    private void delete() {
-        taskRepository.delete(task);
-        changeHandler.onChange();
+    //TODO complete ride from file
+    public Upload getUpload() {
+        return upload;
     }
 
-    private void save() {
-        task.setType(comboBox.getValue());
-        task.setInputData(parseTask(comboBox.getValue()));
-        taskRepository.save(task);
-        changeHandler.onChange();
+    private void importing() {
+
     }
 
     private void cancel() {
         setVisible(false);
+        upload.setVisible(true);
         changeHandler.onChange();
     }
 
+    private void calculate(Task task) {
+        task = taskRepository.findById(task.getId()).orElse(task);
+        if (task.getType().equalsIgnoreCase("Magic square")) {
+            String[] allData = task.getInputData().split("}\\{");
+            for (int i = 0; i < allData.length; i++) {
+                String tmp = allData[i];
+                if (tmp.contains("}")) {
+                    tmp = allData[i].replaceAll("}", "");
+                }
+                if (tmp.contains("{")) {
+                    tmp = allData[i].replaceAll("\\{", "");
+                }
+                allData[i] = tmp;
+            }
+
+
+
+            for (int i = 0; i < allData.length; i++) {
+                if (allData[i].endsWith(".")) {
+                    allData[i] = allData[i].substring(0, allData[i].length() - 1);
+                }
+                allData[i] = Arrays.toString(allData[i].split("\\."));
+            }
+            //TODO Создать метод для вычисления квадрата
+
+
+
+
+
+
+
+        } else if (task.getType().equalsIgnoreCase("Substrings")) {
+            String[] allData = task.getInputData().split(",");
+            String[] substrings = allData[0].split(" ");
+            String[] strings = allData[1].split(" ");
+
+            //Skip first element if space
+            if (Character.compare(allData[1].charAt(0), '\u0020') == 0) {
+                strings = Arrays.stream(strings).skip(1).toArray(String[]::new);
+            }
+
+            //TODO добавить в отображение
+            System.out.println(Arrays.toString(allData));
+            System.out.println(Arrays.toString(substrings));
+            System.out.println(Arrays.toString(strings));
+
+            inArray(substrings, strings);
+
+            System.out.println(Arrays.toString(inArray(substrings, strings)));
+
+        }
+
+    }
+
+    private void delete() {
+        taskRepository.deleteById(task.getId());
+        changeHandler.onChange();
+    }
+
+    //Method creating window for edit task or create task
     public void editTask(Task newTask) {
         if (newTask == null) {
             setVisible(false);
             return;
         }
-
         if (newTask.getId() != null) {
             task = taskRepository.findById(newTask.getId()).orElse(newTask);
         } else {
             task = newTask;
         }
-
         binder.setBean(task);
-
         setVisible(true);
-
-        inputData.focus();
     }
 
+    //Method showing task depending on type task
     private void showField(String type) {
-        if (type.equals("Magic square")) {
+        if (type.equalsIgnoreCase("Magic square")) {
             inputData.setVisible(false);
             inputDataForStrings.setVisible(false);
             showInputDataForSquareTask();
-        } else if (type.equals("Substrings")) {
+        } else if (type.equalsIgnoreCase("Substrings")) {
             inputData.setVisible(true);
             inputDataForStrings.setVisible(true);
             hideInputDataForSquareTask();
@@ -183,7 +278,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         }
     }
 
-    private void hideInputDataForSquareTask() {
+    public void hideInputDataForSquareTask() {
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 inputDataForSquareTask[i][j].setVisible(false);
@@ -191,22 +286,42 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         }
     }
 
+    //Method converts data from fields for creat file name and save data in file
     private String parseTask(String type) {
         if (type.equals("Magic square")) {
             StringBuilder magicSquareData = new StringBuilder("");
             for (int i = 0; i < 3; i++) {
                 magicSquareData.append("{");
                 for (int j = 0; j < 3; j++) {
-                    magicSquareData.append(inputDataForSquareTask[i][j].getValue());
+                    magicSquareData.append(inputDataForSquareTask[i][j].getValue()).append(".");
                 }
                 magicSquareData.append("}");
             }
             return magicSquareData.toString();
         } else if (type.equals("Substrings")) {
-            return inputData.getValue() + ", " + inputDataForStrings.getValue();
+            return inputData.getValue() + "," + inputDataForStrings.getValue();
         }
         return "inputDataIsEmpty";
     }
 
+    private String[] inArray(String[] substringsArray, String[] stringsArray) {
+        String[] substringsInStringsArray = new String[substringsArray.length];
+        int count = 0;
+        for (String substring : substringsArray) {
+            for (String string : stringsArray) {
+                if (string.contains(substring)) {
+                    substringsInStringsArray[count++] = substring;
+                    break;
+                }
+            }
+        }
+        if (count < substringsInStringsArray.length) {
+            String[] tmp = new String[count];
+            System.arraycopy(substringsInStringsArray, 0, tmp, 0, count);
+            substringsInStringsArray = tmp;
+        }
+        Arrays.sort(substringsInStringsArray);
+        return substringsInStringsArray;
+    }
 
 }
