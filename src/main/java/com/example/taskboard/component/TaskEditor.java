@@ -18,8 +18,9 @@ import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +36,6 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private final TextField inputData = new TextField("Input Data for substrings");
     TextField inputDataForStrings = new TextField("Input Data For Strings");
     private final TextField[][] inputDataForSquareTask = new TextField[3][3];
-
     private final Button save = new Button("Save", VaadinIcon.CHECK.create());
     private final Button export = new Button("Export", VaadinIcon.CHECK.create());
     private final Button importing = new Button("Import", VaadinIcon.CHECK.create());
@@ -92,13 +92,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         addKeyPressListener(Key.ENTER, e -> save());
 
         save.addClickListener(e -> save());
-        export.addClickListener(e -> {
-            try {
-                export();
-            } catch (FileNotFoundException ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+        export.addClickListener(e -> export(comboBox.getValue()));
         importing.addClickListener(e -> importing());
         delete.addClickListener(e -> delete());
         cancel.addClickListener(e -> cancel());
@@ -108,11 +102,24 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private void importing() {
     }
 
-    private void export() throws FileNotFoundException {
+    private void export(String type) {
         String absolutePath = new File("").getAbsolutePath();
-                FileOutputStream out = new FileOutputStream(absolutePath +
-                "//src//main//resources//taskDirectory//" + "FileType=" + comboBox.getValue() + "InputData=" +
-                inputData.getValue() + ".txt");
+        Path path = null;
+        if (type.equals("Magic square")) {
+            File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
+                    "FileType=" + comboBox.getValue() + "InputData=" + parseTask(type) + ".txt");
+            path = Path.of(out.getPath());
+        } else if (type.equals("Substrings")) {
+            File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
+                    "FileType=" + comboBox.getValue() + "InputData=" + inputData.getValue() + ".txt");
+            path = Path.of(out.getPath());
+        }
+
+        try {
+            Files.writeString(path, parseTask(comboBox.getValue()), StandardCharsets.UTF_8);
+        } catch (IOException ioException) {
+            System.out.println(ioException.getMessage());
+        }
         changeHandler.onChange();
     }
 
@@ -123,6 +130,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
     private void save() {
         task.setType(comboBox.getValue());
+        task.setInputData(parseTask(comboBox.getValue()));
         taskRepository.save(task);
         changeHandler.onChange();
     }
@@ -181,6 +189,23 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
                 inputDataForSquareTask[i][j].setVisible(false);
             }
         }
+    }
+
+    private String parseTask(String type) {
+        if (type.equals("Magic square")) {
+            StringBuilder magicSquareData = new StringBuilder("");
+            for (int i = 0; i < 3; i++) {
+                magicSquareData.append("{");
+                for (int j = 0; j < 3; j++) {
+                    magicSquareData.append(inputDataForSquareTask[i][j].getValue());
+                }
+                magicSquareData.append("}");
+            }
+            return magicSquareData.toString();
+        } else if (type.equals("Substrings")) {
+            return inputData.getValue() + ", " + inputDataForStrings.getValue();
+        }
+        return "inputDataIsEmpty";
     }
 
 
