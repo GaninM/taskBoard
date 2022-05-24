@@ -14,10 +14,13 @@ import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.spring.annotation.SpringComponent;
 import com.vaadin.flow.spring.annotation.UIScope;
-
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,10 +36,12 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     TextField inputDataForStrings = new TextField("Input Data For Strings");
     private final TextField[][] inputDataForSquareTask = new TextField[3][3];
 
-    private final Button save = new Button("Save" , VaadinIcon.CHECK.create());
+    private final Button save = new Button("Save", VaadinIcon.CHECK.create());
+    private final Button export = new Button("Export", VaadinIcon.CHECK.create());
+    private final Button importing = new Button("Import", VaadinIcon.CHECK.create());
     private final Button cancel = new Button("Cancel");
-    private final Button delete = new Button("Delete" , VaadinIcon.TRASH.create());
-    private final HorizontalLayout actions = new HorizontalLayout(save, cancel, delete);
+    private final Button delete = new Button("Delete", VaadinIcon.TRASH.create());
+    private final HorizontalLayout actions = new HorizontalLayout(save, export, importing, cancel, delete);
 
     private final Binder<Task> binder;
     @Setter
@@ -87,9 +92,28 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         addKeyPressListener(Key.ENTER, e -> save());
 
         save.addClickListener(e -> save());
+        export.addClickListener(e -> {
+            try {
+                export();
+            } catch (FileNotFoundException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        importing.addClickListener(e -> importing());
         delete.addClickListener(e -> delete());
         cancel.addClickListener(e -> cancel());
         setVisible(false);
+    }
+
+    private void importing() {
+    }
+
+    private void export() throws FileNotFoundException {
+        String absolutePath = new File("").getAbsolutePath();
+                FileOutputStream out = new FileOutputStream(absolutePath +
+                "//src//main//resources//taskDirectory//" + "FileType=" + comboBox.getValue() + "InputData=" +
+                inputData.getValue() + ".txt");
+        changeHandler.onChange();
     }
 
     private void delete() {
