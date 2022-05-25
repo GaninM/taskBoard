@@ -9,6 +9,7 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.component.upload.Upload;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 @SpringComponent
 @UIScope
@@ -55,9 +57,9 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private final Button cancel;
     @Getter
     private final Button delete;
-    private final MemoryBuffer buffer;
     private final Upload upload;
-    private final HorizontalLayout actions;
+    @Getter
+    private final TextArea resultArea;
     private final Binder<Task> binder;
     @Setter
     private ChangeHandler changeHandler;
@@ -76,9 +78,10 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         this.calculate = new Button("Calculate", VaadinIcon.CHECK.create());
         this.cancel = new Button("Cancel");
         this.delete = new Button("Delete", VaadinIcon.TRASH.create());
-        this.buffer = new MemoryBuffer();
-        this.actions = new HorizontalLayout(save, export, importing, calculate, cancel, delete);
+        MemoryBuffer buffer = new MemoryBuffer();
+        HorizontalLayout actions = new HorizontalLayout(save, export, importing, calculate, cancel, delete);
         this.upload = new Upload(buffer);
+        this.resultArea = new TextArea();
 
         List<String> taskTypes = new ArrayList<>();
         taskTypes.add("Substrings");
@@ -93,7 +96,11 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         inputData.setVisible(false);
         inputDataForStrings.setVisible(false);
         verticalLayoutForSubstringTask.add(inputData, inputDataForStrings);
-        add(comboBox, verticalLayoutForSubstringTask);
+        resultArea.setVisible(false);
+        resultArea.setReadOnly(true);
+        resultArea.setWidth("400px");
+        resultArea.setHeight("300px");
+        add(comboBox, verticalLayoutForSubstringTask, resultArea);
 
         //initial table for squareTask
         for (int i = 0; i < 3; i++) {
@@ -157,9 +164,9 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         }
 
         try {
-            Files.writeString(path, parseTask(comboBox.getValue()), StandardCharsets.UTF_8);
+            Files.writeString(Objects.requireNonNull(path), parseTask(comboBox.getValue()), StandardCharsets.UTF_8);
         } catch (IOException ioException) {
-            System.out.println(ioException.getMessage());
+            ioException.getStackTrace();
         }
         changeHandler.onChange();
     }
@@ -176,6 +183,8 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private void cancel() {
         setVisible(false);
         upload.setVisible(true);
+        resultArea.setValue("");
+        resultArea.setVisible(false);
         changeHandler.onChange();
     }
 
@@ -193,44 +202,34 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
                 }
                 allData[i] = tmp;
             }
-
-
-
+            int[][] resultArr = new int[3][3];
             for (int i = 0; i < allData.length; i++) {
                 if (allData[i].endsWith(".")) {
                     allData[i] = allData[i].substring(0, allData[i].length() - 1);
                 }
-                allData[i] = Arrays.toString(allData[i].split("\\."));
+                for (int j = 0; j < allData.length; j++) {
+                    String[] tmp = allData[i].split("\\.");
+                    resultArr[i][j] = Integer.parseInt(tmp[j]);
+                }
             }
-            //TODO Создать метод для вычисления квадрата
-
-
-
-
-
-
-
+            findMinimum(resultArr);
         } else if (task.getType().equalsIgnoreCase("Substrings")) {
             String[] allData = task.getInputData().split(",");
             String[] substrings = allData[0].split(" ");
             String[] strings = allData[1].split(" ");
 
             //Skip first element if space
-            if (Character.compare(allData[1].charAt(0), '\u0020') == 0) {
+            if (allData[1].charAt(0) == '\u0020') {
                 strings = Arrays.stream(strings).skip(1).toArray(String[]::new);
             }
 
-            //TODO добавить в отображение
-            System.out.println(Arrays.toString(allData));
-            System.out.println(Arrays.toString(substrings));
-            System.out.println(Arrays.toString(strings));
-
             inArray(substrings, strings);
-
-            System.out.println(Arrays.toString(inArray(substrings, strings)));
-
+            resultArea.setValue("Первый массив: " + "\n" + Arrays.toString(substrings) + "\n\n" +
+                    "Второй массив: " + "\n" + Arrays.toString(strings) + "\n\n" +
+                    "Отсортированные строки из первого массива, которые входят как подстроки во второй: " + "\n" +
+                    Arrays.toString(inArray(substrings, strings)));
+            resultArea.setVisible(true);
         }
-
     }
 
     private void delete() {
@@ -289,7 +288,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     //Method converts data from fields for creat file name and save data in file
     private String parseTask(String type) {
         if (type.equals("Magic square")) {
-            StringBuilder magicSquareData = new StringBuilder("");
+            StringBuilder magicSquareData = new StringBuilder();
             for (int i = 0; i < 3; i++) {
                 magicSquareData.append("{");
                 for (int j = 0; j < 3; j++) {
@@ -321,7 +320,63 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             substringsInStringsArray = tmp;
         }
         Arrays.sort(substringsInStringsArray);
+        substringsInStringsArray = Arrays.stream(substringsInStringsArray).distinct().toArray(String[]::new);
         return substringsInStringsArray;
     }
 
+    private int[] findMinimumFromMS(int[][] arr, int[][] ms) {
+        int[] returnData = new int[2];
+        int count = 0;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (arr[i][j] != ms[i][j])
+                    returnData[0] = count++;
+                returnData[1] += Math.abs(arr[i][j] - ms[i][j]);
+            }
+        }
+        return returnData;
+    }
+
+    private void findMinimum(int[][] arr) {
+        int[][][] ms = {
+                {{8, 1, 6}, {3, 5, 7}, {4, 9, 2}},
+                {{6, 1, 8}, {7, 5, 3}, {2, 9, 4}},
+                {{4, 9, 2}, {3, 5, 7}, {8, 1, 6}},
+                {{2, 9, 4}, {7, 5, 3}, {6, 1, 8}},
+                {{8, 3, 4}, {1, 5, 9}, {6, 7, 2}},
+                {{4, 3, 8}, {9, 5, 1}, {2, 7, 6}},
+                {{6, 7, 2}, {1, 5, 9}, {8, 3, 4}},
+                {{2, 7, 6}, {9, 5, 1}, {4, 3, 8}},
+        };
+
+        int min = 9;
+        int sum = 0;
+        int[][] newArr = new int[3][3];
+        for (int i = 0; i < 8; i++) {
+            int x = findMinimumFromMS(arr, ms[i])[0];
+            if (x < min) {
+                min = x;
+                sum = findMinimumFromMS(arr, ms[i])[1];
+                newArr = ms[i];
+            }
+        }
+        resultArea.setValue("Первоночальный массив: " + "\n" + printArray(arr) + "\n" +
+                "Новый массив: " + "\n" + printArray(newArr) + "\n" +
+                "Колличество замененных чисел: " + min + "\n" +
+                "Сумма замененых числе " + sum);
+        resultArea.setVisible(true);
+    }
+
+    private String printArray(int[][] arr) {
+        StringBuilder arrayText = new StringBuilder();
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                arrayText.append(arr[i][j]).append("\t");
+            }
+            arrayText.append("\n");
+        }
+        return String.valueOf(arrayText);
+    }
 }
+
+

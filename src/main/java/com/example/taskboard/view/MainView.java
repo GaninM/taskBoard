@@ -17,21 +17,16 @@ public class MainView extends VerticalLayout {
     private final transient TaskRepository taskRepository;
 
     private final TextField filter;
-    private final Button addNewBtn;
-    private final HorizontalLayout toolbar;
-
-    private final TaskEditor editor;
 
     private final Grid<Task> grid;
 
     @Autowired
     public MainView(TaskRepository taskRepository, TaskEditor editor) {
         this.taskRepository = taskRepository;
-        this.editor = editor;
         this.grid = new Grid<>(Task.class);
         this.filter = new TextField("", "Type to filter");
-        this.addNewBtn = new Button("Add new");
-        this.toolbar = new HorizontalLayout(filter, addNewBtn);
+        Button addNewBtn = new Button("Add new");
+        HorizontalLayout toolbar = new HorizontalLayout(filter, addNewBtn);
 
         add(toolbar, grid, editor, editor.getUpload());
 
@@ -50,6 +45,8 @@ public class MainView extends VerticalLayout {
             editor.getExport().setVisible(false);
             editor.getImporting().setVisible(false);
             editor.getUpload().setVisible(false);
+            editor.getResultArea().setVisible(false);
+            editor.getCalculate().setVisible(true);
         });
 
         editor.setChangeHandler(() -> {
@@ -64,6 +61,8 @@ public class MainView extends VerticalLayout {
             editor.getExport().setVisible(true);
             editor.getImporting().setVisible(true);
             editor.getUpload().setVisible(true);
+            editor.getResultArea().setVisible(false);
+            editor.getCalculate().setVisible(false);
         });
 
         showTask("");
