@@ -98,7 +98,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             } catch (IOException ex) {
                 ex.getStackTrace();
             }
-            calculate(taskFromUpload);
+            calculate(Objects.requireNonNull(taskFromUpload));
             resultArea.setVisible(true);
             calculate.setVisible(true);
         });
@@ -346,7 +346,7 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         return String.valueOf(arrayText);
     }
 
-    static boolean isMagicSquare(int mat[][]) {
+    static boolean isMagicSquare(int[][] mat) {
         // sumd1 and sumd2 are the sum of the two diagonals
         int sumd1 = 0;
         int sumd2 = 0;
@@ -357,8 +357,9 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             sumd2 += mat[i][3 - 1 - i];
         }
         // if the two diagonal sums are unequal then it is not a magic square
-        if (sumd1 != sumd2)
+        if (sumd1 != sumd2) {
             return false;
+        }
 
         // calculating sums of Rows and columns and checking if they are equal to each other,
         // as well as equal to diagonal sum or not
@@ -370,8 +371,9 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
                 rowSum += mat[i][j];
                 colSum += mat[j][i];
             }
-            if (rowSum != colSum || colSum != sumd1)
+            if (rowSum != colSum || colSum != sumd1) {
                 return false;
+            }
         }
         return true;
     }

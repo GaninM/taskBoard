@@ -5,7 +5,6 @@ import com.example.taskboard.model.Task;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.textfield.TextField;
 import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -20,7 +19,7 @@ public class FileController {
     @Setter
     ChangeHandler changeHandler;
 
-    public void export(String type, ComboBox comboBox, TextField[][] inputDataForSquareTask, TextField inputData,
+    public void export(String type, ComboBox<String> comboBox, TextField[][] inputDataForSquareTask, TextField inputData,
                        TextField inputDataForStrings) {
         String absolutePath = new File("").getAbsolutePath();
         Path path = null;
@@ -36,7 +35,7 @@ public class FileController {
         }
 
         try {
-            Files.writeString(Objects.requireNonNull(path), parseTask((String) comboBox.getValue(),
+            Files.writeString(Objects.requireNonNull(path), parseTask(comboBox.getValue(),
                     inputDataForSquareTask, inputData, inputDataForStrings), StandardCharsets.UTF_8);
         } catch (IOException ioException) {
             ioException.getStackTrace();
