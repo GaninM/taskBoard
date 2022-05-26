@@ -28,22 +28,23 @@ public class MainView extends VerticalLayout {
         Button addNewBtn = new Button("Add new");
         HorizontalLayout toolbar = new HorizontalLayout(filter, addNewBtn);
 
-        add(toolbar, grid, editor, editor.getUpload());
+        add(toolbar, grid, editor, editor.getUpload(), editor.getResultArea());
 
         //Creating filter settings
         filter.setValueChangeMode(ValueChangeMode.EAGER);
         filter.addValueChangeListener(e -> showTask(e.getValue()));
+        editor.getResultArea().setVisible(false);
 
         //Added function for edit table row on click
         grid.asSingleSelect().addValueChangeListener(e -> {
             editor.editTask(e.getValue());
             editor.getComboBox().setVisible(false);
+            editor.getComboBox().setValue("");
             editor.getInputData().setVisible(false);
             editor.getInputDataForStrings().setVisible(false);
             editor.hideInputDataForSquareTask();
             editor.getSave().setVisible(false);
             editor.getExport().setVisible(false);
-            editor.getImporting().setVisible(false);
             editor.getUpload().setVisible(false);
             editor.getResultArea().setVisible(false);
             editor.getCalculate().setVisible(true);
@@ -59,8 +60,7 @@ public class MainView extends VerticalLayout {
             editor.getComboBox().setVisible(true);
             editor.getSave().setVisible(true);
             editor.getExport().setVisible(true);
-            editor.getImporting().setVisible(true);
-            editor.getUpload().setVisible(true);
+            editor.getUpload().setVisible(false);
             editor.getResultArea().setVisible(false);
             editor.getCalculate().setVisible(false);
         });

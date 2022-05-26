@@ -1,5 +1,6 @@
 package com.example.taskboard.component;
 
+import com.example.taskboard.controllers.FileController;
 import com.vaadin.flow.component.Key;
 import com.example.taskboard.model.Task;
 import com.example.taskboard.repository.TaskRepository;
@@ -21,21 +22,15 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.io.*;
+import java.util.*;
 
 @SpringComponent
 @UIScope
 public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
     private final TaskRepository taskRepository;
+    private final FileController fileController;
     private Task task;
     @Getter
     private final ComboBox<String> comboBox;
@@ -50,13 +45,13 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     @Getter
     private final Button export;
     @Getter
-    private final Button importing;
-    @Getter
     private final Button calculate;
     @Getter
     private final Button cancel;
     @Getter
     private final Button delete;
+    private final MemoryBuffer buffer;
+    @Getter
     private final Upload upload;
     @Getter
     private final TextArea resultArea;
@@ -65,8 +60,9 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
     private ChangeHandler changeHandler;
 
     @Autowired
-    public TaskEditor(TaskRepository taskRepository) {
+    public TaskEditor(TaskRepository taskRepository, FileController fileController) {
         this.taskRepository = taskRepository;
+        this.fileController = fileController;
         this.binder = new Binder<>(Task.class);
         this.comboBox = new ComboBox<>("Task type");
         this.inputData = new TextField("Input Data for substrings");
@@ -74,14 +70,39 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         this.inputDataForSquareTask = new TextField[3][3];
         this.save = new Button("Save", VaadinIcon.CHECK.create());
         this.export = new Button("Export", VaadinIcon.CHECK.create());
-        this.importing = new Button("Import", VaadinIcon.CHECK.create());
         this.calculate = new Button("Calculate", VaadinIcon.CHECK.create());
         this.cancel = new Button("Cancel");
         this.delete = new Button("Delete", VaadinIcon.TRASH.create());
-        MemoryBuffer buffer = new MemoryBuffer();
-        HorizontalLayout actions = new HorizontalLayout(save, export, importing, calculate, cancel, delete);
+        this.buffer = new MemoryBuffer();
         this.upload = new Upload(buffer);
         this.resultArea = new TextArea();
+        HorizontalLayout resultLayout = new HorizontalLayout(calculate, resultArea);
+        HorizontalLayout actions = new HorizontalLayout(save, export, cancel, delete);
+
+
+        upload.setDropAllowed(true);
+        upload.setWidth("500px");
+        upload.setAcceptedFileTypes(".txt");
+        upload.setMaxFiles(1);
+        upload.setVisible(true);
+
+        resultArea.setReadOnly(true);
+        resultArea.setWidth("400px");
+        resultArea.setHeight("300px");
+        upload.addSucceededListener(e -> {
+            Task taskFromUpload = null;
+            InputStream fileData = buffer.getInputStream();
+            String fileName = e.getFileName();
+            try {
+                taskFromUpload = fileController.importing(fileData, fileName);
+            } catch (IOException ex) {
+                ex.getStackTrace();
+            }
+            calculate(taskFromUpload);
+            resultArea.setVisible(true);
+            calculate.setVisible(true);
+        });
+
 
         List<String> taskTypes = new ArrayList<>();
         taskTypes.add("Substrings");
@@ -89,18 +110,12 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         comboBox.setItems(taskTypes);
         comboBox.addValueChangeListener(e -> showField(e.getValue()));
 
-
         VerticalLayout verticalLayoutForSubstringTask = new VerticalLayout();
         inputDataForStrings.setWidth("1000px");
         inputData.setWidth("1000px");
         inputData.setVisible(false);
         inputDataForStrings.setVisible(false);
         verticalLayoutForSubstringTask.add(inputData, inputDataForStrings);
-        resultArea.setVisible(false);
-        resultArea.setReadOnly(true);
-        resultArea.setWidth("400px");
-        resultArea.setHeight("300px");
-        add(comboBox, verticalLayoutForSubstringTask, resultArea);
 
         //initial table for squareTask
         for (int i = 0; i < 3; i++) {
@@ -116,13 +131,8 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             add(horizontalLayout);
         }
 
-        //TODO complete ride from file
-        upload.setDropAllowed(true);
-        upload.setWidth("500px");
-        upload.setAcceptedFileTypes(".txt");
-        upload.setMaxFiles(1);
-        upload.setVisible(true);
-        add(actions);
+        resultLayout.setVisible(true);
+        add(resultLayout, comboBox, verticalLayoutForSubstringTask, actions);
 
         binder.bindInstanceFields(this);
 
@@ -133,9 +143,8 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         addKeyPressListener(Key.ENTER, e -> save());
 
         save.addClickListener(e -> save());
-        export.addClickListener(e -> export(comboBox.getValue()));
-        //TODO complete ride from file
-        importing.addClickListener(e -> e.getClickCount());
+        export.addClickListener(e -> fileController.export(comboBox.getValue(), comboBox, inputDataForSquareTask,
+                inputData, inputDataForStrings));
         cancel.addClickListener(e -> cancel());
         calculate.addClickListener(e -> calculate(task));
         delete.addClickListener(e -> delete());
@@ -144,40 +153,11 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
 
     private void save() {
         task.setType(comboBox.getValue());
-        task.setInputData(parseTask(comboBox.getValue()));
+        task.setInputData(fileController.parseTask(comboBox.getValue(), inputDataForSquareTask,
+                inputData, inputDataForStrings));
         taskRepository.save(task);
         changeHandler.onChange();
-    }
-
-    //Method exporting data in file and saved this file
-    private void export(String type) {
-        String absolutePath = new File("").getAbsolutePath();
-        Path path = null;
-        if (type.equalsIgnoreCase("Magic square")) {
-            File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
-                    "FileType=" + comboBox.getValue() + "InputData=" + parseTask(type) + ".txt");
-            path = Path.of(out.getPath());
-        } else if (type.equalsIgnoreCase("Substrings")) {
-            File out = new File(absolutePath + "//src//main//resources//taskDirectory//" +
-                    "FileType=" + comboBox.getValue() + "InputData=" + inputData.getValue() + ".txt");
-            path = Path.of(out.getPath());
-        }
-
-        try {
-            Files.writeString(Objects.requireNonNull(path), parseTask(comboBox.getValue()), StandardCharsets.UTF_8);
-        } catch (IOException ioException) {
-            ioException.getStackTrace();
-        }
-        changeHandler.onChange();
-    }
-
-    //TODO complete ride from file
-    public Upload getUpload() {
-        return upload;
-    }
-
-    private void importing() {
-
+        comboBox.setValue("");
     }
 
     private void cancel() {
@@ -186,10 +166,16 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         resultArea.setValue("");
         resultArea.setVisible(false);
         changeHandler.onChange();
+        comboBox.setValue("");
+    }
+
+    private void delete() {
+        taskRepository.deleteById(task.getId());
+        changeHandler.onChange();
     }
 
     private void calculate(Task task) {
-        task = taskRepository.findById(task.getId()).orElse(task);
+        //task = taskRepository.findById(task.getId()).orElse(task);
         if (task.getType().equalsIgnoreCase("Magic square")) {
             String[] allData = task.getInputData().split("}\\{");
             for (int i = 0; i < allData.length; i++) {
@@ -230,11 +216,6 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
                     Arrays.toString(inArray(substrings, strings)));
             resultArea.setVisible(true);
         }
-    }
-
-    private void delete() {
-        taskRepository.deleteById(task.getId());
-        changeHandler.onChange();
     }
 
     //Method creating window for edit task or create task
@@ -283,24 +264,6 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
                 inputDataForSquareTask[i][j].setVisible(false);
             }
         }
-    }
-
-    //Method converts data from fields for creat file name and save data in file
-    private String parseTask(String type) {
-        if (type.equals("Magic square")) {
-            StringBuilder magicSquareData = new StringBuilder();
-            for (int i = 0; i < 3; i++) {
-                magicSquareData.append("{");
-                for (int j = 0; j < 3; j++) {
-                    magicSquareData.append(inputDataForSquareTask[i][j].getValue()).append(".");
-                }
-                magicSquareData.append("}");
-            }
-            return magicSquareData.toString();
-        } else if (type.equals("Substrings")) {
-            return inputData.getValue() + "," + inputDataForStrings.getValue();
-        }
-        return "inputDataIsEmpty";
     }
 
     private String[] inArray(String[] substringsArray, String[] stringsArray) {
@@ -352,19 +315,24 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
         int min = 9;
         int sum = 0;
         int[][] newArr = new int[3][3];
-        for (int i = 0; i < 8; i++) {
-            int x = findMinimumFromMS(arr, ms[i])[0];
-            if (x < min) {
-                min = x;
-                sum = findMinimumFromMS(arr, ms[i])[1];
-                newArr = ms[i];
+        if (isMagicSquare(arr)) {
+            resultArea.setValue("Данный массив является магическим квадратом: " + "\n" + printArray(arr));
+            resultArea.setVisible(true);
+        } else {
+            for (int i = 0; i < 8; i++) {
+                int x = findMinimumFromMS(arr, ms[i])[0];
+                if (x < min) {
+                    min = x;
+                    sum = findMinimumFromMS(arr, ms[i])[1];
+                    newArr = ms[i];
+                }
             }
+            resultArea.setValue("Первоночальный массив: " + "\n" + printArray(arr) + "\n" +
+                    "Новый массив: " + "\n" + printArray(newArr) + "\n" +
+                    "Колличество замененных чисел: " + min + "\n" +
+                    "Сумма замененых числе " + sum);
+            resultArea.setVisible(true);
         }
-        resultArea.setValue("Первоночальный массив: " + "\n" + printArray(arr) + "\n" +
-                "Новый массив: " + "\n" + printArray(newArr) + "\n" +
-                "Колличество замененных чисел: " + min + "\n" +
-                "Сумма замененых числе " + sum);
-        resultArea.setVisible(true);
     }
 
     private String printArray(int[][] arr) {
@@ -376,6 +344,36 @@ public class TaskEditor extends VerticalLayout implements KeyNotifier {
             arrayText.append("\n");
         }
         return String.valueOf(arrayText);
+    }
+
+    static boolean isMagicSquare(int mat[][]) {
+        // sumd1 and sumd2 are the sum of the two diagonals
+        int sumd1 = 0;
+        int sumd2 = 0;
+        for (int i = 0; i < 3; i++) {
+            // (i, i) is the diagonal from top-left -> bottom-right
+            // (i, N - i - 1) is the diagonal from top-right -> bottom-left
+            sumd1 += mat[i][i];
+            sumd2 += mat[i][3 - 1 - i];
+        }
+        // if the two diagonal sums are unequal then it is not a magic square
+        if (sumd1 != sumd2)
+            return false;
+
+        // calculating sums of Rows and columns and checking if they are equal to each other,
+        // as well as equal to diagonal sum or not
+        for (int i = 0; i < 3; i++) {
+
+            int rowSum = 0;
+            int colSum = 0;
+            for (int j = 0; j < 3; j++) {
+                rowSum += mat[i][j];
+                colSum += mat[j][i];
+            }
+            if (rowSum != colSum || colSum != sumd1)
+                return false;
+        }
+        return true;
     }
 }
 
